@@ -72,12 +72,12 @@ when_to_use: |
    ffmpeg -i "input.{ext}" -map 0:0 -acodec libmp3lame -ab 128k "output.mp3"
    ```
 
-2. **语音转写**（Apple Silicon 优先用 Fun-ASR）：
-   - **中文首选**：`mlx-community/Fun-ASR-Nano-2512-fp16`（~400MB，支持 7 种方言）
-   - **多语言备选**：`mlx-community/whisper-large-v3-turbo`（~800MB，99+ 语言）
+2. **语音转写**（Apple Silicon 优先用 SenseVoice）：
+   - **中文首选**：`mlx-community/SenseVoiceSmall`（~900MB，阿里通义实验室，支持中英日韩粤）
+   - **多语言备选**：`mlx-community/whisper-medium`（~1.5GB，99+ 语言）
    ```bash
    # 使用转写脚本（自动选择引擎）
-   python3 scripts/transcribe.py audio.mp3                    # 默认 Fun-ASR
+   python3 scripts/transcribe.py audio.mp3                    # 默认 SenseVoice
    python3 scripts/transcribe.py audio.mp3 --engine whisper    # Whisper 备选
    ```
    详细模型对比见 `references/asr-model-comparison.md`
@@ -142,10 +142,15 @@ when_to_use: |
 
 ### v0.2（2026-05-31）— ASR 模型升级
 - 新增 `references/asr-model-comparison.md`：6 款主流 ASR 模型中文场景对比
-- 推荐从 `whisper-medium` 升级到 `Fun-ASR-Nano-2512`（阿里通义，MLX 原生，~400MB，中文准确度最高）
-- 更新 `scripts/transcribe.py`：支持双引擎（`--engine funasr/whisper`）
+- 初始推荐 Fun-ASR-Nano-2512，后发现 mlx-audio 0.4.3 不支持 `funasr` 模型类型
+- 实际采用 **SenseVoiceSmall**（`mlx-community/SenseVoiceSmall`，~900MB，阿里通义实验室）
+  - 中文准确度极高，30s 音频 1.67s 完成（~18x 实时速度）
+  - 支持语言/情感/音频事件检测
+  - mlx-audio 原生支持，无需额外依赖
+- 更新 `scripts/transcribe.py`：支持双引擎（`--engine sensevoice/whisper`）
 - 新增大文件处理建议：>60min 音频建议按 10-15min 切片并行转写
-- 新增代理问题解决方案：NO_PROXY / socksio / 手动下载
+- 新增代理问题解决方案：NO_PROXY / socksio / HF Mirror (hf-mirror.com)
+- HF Mirror + 禁用代理是国内下载 HuggingFace 模型的可靠方案
 
 ## 支撑文件
 

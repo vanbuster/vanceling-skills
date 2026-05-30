@@ -33,25 +33,29 @@
 
 ## 3. 推荐方案
 
-### 🏆 首选：Fun-ASR-Nano-2512（MLX 版）
+### 🏆 首选：SenseVoiceSmall（MLX 版）
 
-- **HuggingFace**: `mlx-community/Fun-ASR-Nano-2512-fp16`
-- **来源**: 阿里巴巴通义实验室
+- **HuggingFace**: `mlx-community/SenseVoiceSmall`
+- **来源**: 阿里巴巴通义实验室（同 Fun-ASR 系列）
 - **优势**:
-  - MLX 原生，Apple Silicon 最优
-  - 中文准确度最高（训练数据含数千万小时真实语音）
-  - 支持 7 种方言（粤语、吴语、闽南语、客家话、赣语、湘语、晋语）
-  - 模型仅 ~400MB，下载快
-  - 支持中英日混合
+  - mlx-audio 原生支持，无需额外依赖
+  - 中文准确度极高（30s 音频实测，口语识别远超 whisper-medium）
+  - 支持语言检测（zh/en/ja/ko/yue）、情感识别、音频事件检测
+  - Apple Silicon 原生推理，30s 音频 1.67s 完成（~18x 实时速度）
+  - 模型 ~900MB
 - **安装**:
   ```bash
   pip install mlx-audio
   ```
 - **使用**:
   ```python
-  from mlx_audio.stt import transcribe
-  result = transcribe("audio.mp3", model="mlx-community/Fun-ASR-Nano-2512-fp16")
+  from mlx_audio.stt.generate import generate_transcription
+  result = generate_transcription(model="mlx-community/SenseVoiceSmall", audio="audio.mp3")
   ```
+
+> **注意**：Fun-ASR-Nano-2512（`mlx-community/Fun-ASR-Nano-2512-fp16`）虽然在 HF 上有 MLX 版，
+> 但其 `model_type: funasr` 截至 mlx-audio 0.4.3 尚未被支持，加载时会报 `ValueError: Model type funasr not supported`。
+> 同属通义实验室的 SenseVoice 是当前 mlx-audio 中中文场景的最佳选择。
 
 ### 🥈 备选：whisper-large-v3-turbo（MLX 版）
 
@@ -75,11 +79,11 @@
 # Step 1: 转码（如果需要）
 ffmpeg -i "input.qta" -map 0:0 -acodec libmp3lame -ab 128k "output.mp3"
 
-# Step 2: 转写（首选 Fun-ASR）
+# Step 2: 转写（首选 SenseVoice）
 python3 -c "
-from mlx_audio.stt import transcribe
-result = transcribe('output.mp3', model='mlx-community/Fun-ASR-Nano-2512-fp16')
-print(result['text'])
+from mlx_audio.stt.generate import generate_transcription
+result = generate_transcription(model='mlx-community/SenseVoiceSmall', audio='output.mp3')
+print(result.text)
 "
 
 # Step 3: 切段（按时间戳）
