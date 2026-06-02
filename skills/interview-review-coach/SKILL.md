@@ -19,9 +19,9 @@ when_to_use: |
 ### Phase 1：信息采集与文档模板生成
 
 1. **收集素材**：
-   - JD 图片 → 用 `analyze_image` MCP 工具提取岗位要求、公司信息
+   - JD 图片 → **先用 Read 工具读取图片（自动上传 CDN），再用 `analyze_image` MCP 工具从 CDN URL 提取岗位要求**（注意：`analyze_image` 不支持本地文件路径，只支持远程 URL）
    - 面试笔记 PDF → 用 PyPDF2 提取文本内容
-   - 面试音频 → 用 ffmpeg 转码 + mlx-whisper 转写（见 Phase 2）
+   - 面试音频 → 用 ffmpeg 转码 + SenseVoice/Whisper 转写（见 Phase 2）
 
 2. **生成复盘文档模板**：
    ```
@@ -61,8 +61,9 @@ when_to_use: |
    ```
 
 3. **写入飞书 Wiki**：
-   - 使用 `docx_builtin_import` 创建文档
-   - 使用 `drive_v1_permissionMember_create` 设置权限（如需要）
+   - 使用 `docx_builtin_import` 创建文档（一次性生成完整内容，此接口不支持增量更新）
+   - 使用 `drive permission.public patch` 设置文档为组织内可读（`security_entity: anyone_can_view`）
+   - 注意：`drive permission.members create` 可能报 `1063001 Invalid parameter`，此时改用 `permission.public patch`
 
 ### Phase 2：音频转写与逐题分析
 
@@ -75,10 +76,21 @@ when_to_use: |
 2. **语音转写**（Apple Silicon 优先用 SenseVoice）：
    - **中文首选**：`mlx-community/SenseVoiceSmall`（~900MB，阿里通义实验室，支持中英日韩粤）
    - **多语言备选**：`mlx-community/whisper-medium`（~1.5GB，99+ 语言）
+
+   **⚠️ SenseVoice 长音频限制**：SenseVoice 会将整段音频一次性加载到 Metal 缓冲区，超过约 5 分钟的音频会导致内存溢出（`RuntimeError: [metal::malloc]`）。**必须先切片再转写。**
+
    ```bash
-   # 使用转写脚本（自动选择引擎）
-   python3 scripts/transcribe.py audio.mp3                    # 默认 SenseVoice
-   python3 scripts/transcribe.py audio.mp3 --engine whisper    # Whisper 备选
+   # Step 1：切成 5 分钟片段（-segment_time 300 = 300 秒）
+   mkdir -p chunks
+   ffmpeg -i "output.mp3" -f segment -segment_time 300 -c copy "chunks/chunk_%03d.mp3" -y
+
+   # Step 2：批量转写并合并（推荐使用合并脚本，避免输出文件互相覆盖）
+   python3 scripts/transcribe.py output.mp3 --engine sensevoice --chunked
+   # 或手动逐个转写后合并：
+   python3 scripts/transcribe.py output.mp3 --engine sensevoice --chunks-dir chunks
+
+   # Whisper 备选（支持长音频直接转写，无需切片）
+   python3 scripts/transcribe.py audio.mp3 --engine whisper
    ```
    详细模型对比见 `references/asr-model-comparison.md`
 
@@ -151,6 +163,18 @@ when_to_use: |
 - 新增大文件处理建议：>60min 音频建议按 10-15min 切片并行转写
 - 新增代理问题解决方案：NO_PROXY / socksio / HF Mirror (hf-mirror.com)
 - HF Mirror + 禁用代理是国内下载 HuggingFace 模型的可靠方案
+
+### v0.3（2026-06-02）— 长音频切片 + 流程优化
+- **关键发现**：SenseVoice 对 >5min 音频会 Metal 内存溢出（需 14GB，上限 ~14.3GB），必须先切片再转写
+  - 解决方案：ffmpeg 按 5 分钟切片 → 逐段 SenseVoice 转写 → 合并带时间戳的文本
+  - 实测 30min 音频：7 个切片，总计 ~40 秒完成（~45x 实时速度）
+- **关键发现**：`analyze_image` MCP 工具不支持本地文件路径（error 1210），必须先用 Read 工具上传 CDN 再调用
+- **关键发现**：`drive.permission.members.create` 可能报 1063001 Invalid parameter，改用 `permission.public patch` 设置组织内可读
+- **关键发现**：`docx_builtin_import` 不支持增量更新，需要一次性生成完整内容（含音频链接）
+- 更新 Phase 1：JD 图片提取流程改为 Read → CDN → analyze_image
+- 更新 Phase 2：新增「SenseVoice 长音频限制」警告和切片转写的具体命令
+- 更新 Phase 1 权限方案：`permission.public patch` 作为默认方案
+- 实战：深度赋智 AI 产品设计实习生一面复盘（30min 音频，9 个 Q&A 段落，9 个音频切片）
 
 ## 支撑文件
 

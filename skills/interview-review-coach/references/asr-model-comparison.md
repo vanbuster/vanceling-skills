@@ -43,6 +43,10 @@
   - 支持语言检测（zh/en/ja/ko/yue）、情感识别、音频事件检测
   - Apple Silicon 原生推理，30s 音频 1.67s 完成（~18x 实时速度）
   - 模型 ~900MB
+- **限制**:
+  - **不支持长音频直接转写**：>5min 的音频会触发 Metal 内存溢出（`RuntimeError: [metal::malloc]`，需 ~14GB）
+  - 必须先切片（建议 5 分钟/段），逐段转写后合并
+  - 使用 `--chunked` 参数自动处理：`python3 transcribe.py audio.mp3 --chunked`
 - **安装**:
   ```bash
   pip install mlx-audio
